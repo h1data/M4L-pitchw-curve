@@ -1,6 +1,6 @@
 /**
  * @fileoverview jsui script for PitchW curve Max for Live device (main part)
- * @version 1.0.0 (30, October, 2021)
+ * @version 1.1.0 (18, December, 2021)
  * @author h1data
  */
 
@@ -13,13 +13,17 @@ mgraphics.init();
 mgraphics.relative_coords = 0;
 mgraphics.autofill = 0;
 
-var pbPositionY = 81;    // the pitch bend position
-var selection = null;    // from / to
+// const
 var FROM = 0;
 var TO = 1;
+var UNSIGNED_FULL = 16383;
+var SIGNED_FULL = 8192;
+// variables
+var pbPositionY = 81;    // the pitch bend position
+var selection = null;    // from / to
 var isActive = 1;
 var pMouseY;  // p5js-ish
-var fromValue = 8192;
+var fromValue = SIGNED_FULL;
 var toValue = 0;
 
 var COLOR = {
@@ -95,7 +99,7 @@ function setColor(attr, r, g, b, a) {
  */
 function setFrom(from) {
   // post('setFrom', from, '\n');
-  fromValue = Math.round(from) + 8192;
+  fromValue = Math.round(from) + SIGNED_FULL;
   outlet(0, 'from', fromValue);
   setRangePosition();
 }
@@ -106,7 +110,7 @@ function setFrom(from) {
  */
  function setTo(to) {
   // post('setTo', to, '\n');
-  toValue = Math.round(to) + 8192;
+  toValue = Math.round(to) + SIGNED_FULL;
   outlet(0, 'to', toValue);
   setRangePosition();
 }
@@ -240,22 +244,20 @@ function onclick(x, y, but, cmd, shift, capslock, option, ctrl) {
 
 ondrag.local = 1;
 function ondrag(x, y, but, cmd, shift, capslock, option, ctrl) {
-  // post('ondrag', y, but, '\n');
+  // post('ondrag', y, but, cmd, shift, '\n');
   if (but) {
     if (selection == null) return;
     var dy = y - pMouseY;
     pMouseY = y;
-
     if (selection == FROM) {
-      // 16383 / 158px -> 103.69
-      fromValue = clip(shift ? fromValue - dy*0.25 : Math.round(fromValue - dy*103.69), 0, 16383);
+      fromValue = calcValue(cmd, shift, fromValue, dy, y);
       outlet(0, 'from', fromValue);
-      outlet(0, 'numFrom', fromValue - 8192.0);
+      outlet(0, 'numFrom', fromValue - SIGNED_FULL);
       setRangePosition();
     } else if (selection == TO) {
-      toValue = clip(shift ? toValue - dy*0.25 : Math.round(toValue - dy*103.69), 0, 16383);
+      toValue = calcValue(cmd, shift, toValue, dy, y);
       outlet(0, 'to', toValue);
-      outlet(0, 'numTo', toValue - 8192.0);
+      outlet(0, 'numTo', toValue - SIGNED_FULL);
       setRangePosition();
     }
   } else {
@@ -263,10 +265,24 @@ function ondrag(x, y, but, cmd, shift, capslock, option, ctrl) {
     outlet(0, 'draw');
   }
 
-  function clip(x, min, max) {
-    return Math.min(Math.max(x, min), max);
-  } 
+  function calcValue(cmd, shift, value, delta, pos) {
+    // (129-1)steps / 158px -> 0.8101265823, 16383 / (129-1)steps -> 127.9921875
+    if (shift && cmd) return clip(Math.round(UNSIGNED_FULL - Math.round(pos*0.8101265823) * 127.9921875), 0, UNSIGNED_FULL);
 
+    // (25-1)steps / 158px -> 0.1518987342, 16383 / (25-1)steps -> 682.625
+    if (cmd) return clip(Math.round(UNSIGNED_FULL - Math.round(pos*0.1518987342) * 682.625), 0, UNSIGNED_FULL);
+
+    // 1value / 4px -> 0.25
+    if (shift) return clip(value - delta*0.25, 0, UNSIGNED_FULL);
+    
+    // 16383 / 158px -> 103.689873
+    return clip(Math.round(UNSIGNED_FULL - pos * 103.689873), 0, UNSIGNED_FULL);
+    //return clip(Math.round(value - delta*103.689873), 0, UNSIGNED_FULL);
+  }
+  
+  function clip(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
 }
 
 onidleout.local = 1;
