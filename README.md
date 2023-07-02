@@ -1,5 +1,5 @@
 # PitchW curve Max for Live MIDI Effect
-![example patch image](thumbnail/pitchwc.gif)
+![PitchW Curve image](thumbnail/pitchwc.gif)
 ## Download
 https://maxforlive.com/library/device/6327/pitchw-curve<br>
 See [releases](https://github.com/h1data/M4L-pitchw-curve/releases) for older versions.
