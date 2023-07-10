@@ -1,14 +1,18 @@
 # PitchW curve Max for Live MIDI Effect
 ![PitchW Curve image](thumbnail/pitchwc.gif)
-## Download
-https://maxforlive.com/library/device/6327/pitchw-curve<br>
-See [releases](https://github.com/h1data/M4L-pitchw-curve/releases) for older versions.
 
 ## What is this?
 A simple MIDI effect for Ableton Live which generates pitch bend message curves with note on.<br>
 Suitable for bending down synth percussion sounds in drum rack.
 
 Based on the device [PitchW ADSR](https://maxforlive.com/library/device/3904/pitchw-adsr) by LAEX with additional features.
+
+## Download
+https://maxforlive.com/library/device/6327/pitchw-curve<br>
+See [releases](https://github.com/h1data/M4L-pitchw-curve/releases) for older versions.
+
+## Requirements
+- Ableton Live 9.7.7 / Cycling '74 Max 6.1.7 or later
 
 ## Parameters
 - `From` Adjusts the initial pitch bend value at note on.
