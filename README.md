@@ -12,7 +12,7 @@ https://maxforlive.com/library/device/6327/pitchw-curve<br>
 See [releases](https://github.com/h1data/M4L-pitchw-curve/releases) for older versions.
 
 ## Requirements
-- Ableton Live 9.7.7 / Cycling '74 Max 6.1.7 or later
+- Ableton Live 9.7.7 / Cycling '74 Max 7.3.5 or later
 
 ## Parameters
 - `From` Adjusts the initial pitch bend value at note on.
