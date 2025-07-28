@@ -5,6 +5,6 @@ Based on the device "PitchW ADSR" by LAEX with additional features.
 
 Check URL for more descriptions.
 
-Changes in version 1.4.0 (July 31, 2025)
+Changes in version 1.4.0 (July 28, 2025)
 -  The mouse cursor is hidden while dragging brackets in the Pitch Bend Monitor.
    As a result, now you can drag infinitely while holding the shift key.
