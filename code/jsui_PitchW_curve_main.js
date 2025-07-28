@@ -1,7 +1,8 @@
 /**
  * @fileoverview jsui script for PitchW curve Max for Live device (main part)
- * @version 1.1.0 (18, December, 2021)
+ * @version 1.4.0 July, 2025
  * @author h1data
+ * @since 2021
  */
 
 // global parameters
@@ -18,13 +19,18 @@ var FROM = 0;
 var TO = 1;
 var UNSIGNED_FULL = 16383;
 var SIGNED_FULL = 8192;
+var PATCHER_HEIGHT = 163;
 // variables
-var pbPositionY = 81;    // the pitch bend position
-var selection = null;    // from / to
+var pbPositionY = 81;   // the pitch bend position
+var selection = null;   // from / to
 var isActive = 1;
-var pMouseY;  // p5js-ish
+var liveZoom = 1.0;
+var cMouseX;            // X of Cursor position in screen
+var cMouseY;            // Y of Cursor position in screen
+var pMouseY;            // Y of Previous position in jsui
 var fromValue = SIGNED_FULL;
 var toValue = 0;
+var isPrecise = false;  // true if shift + drag mode
 
 var COLOR = {
   fg: [0.917647, 0.94902, 0.054902255],       // control_selection or lcd_control_fg
@@ -34,7 +40,7 @@ var COLOR = {
   a2: 0.25,
 };
 
-/** (const) position for pitch bend indicator */
+/** @const position for pitch bend indicator */
 var RECT = {
   left: 2,          // left most
   top: 2,           // top most
@@ -44,22 +50,37 @@ var RECT = {
 
 /** variable position for RANGE indicators */
 var RANGE = {
-  vLeft: 2,     // (const) left of left-side vertical line
-  vRight: 18,   // (const) left of right-side vertical line
-  hLeft: 3,     // (const) left of horizontal line
-  hRight: 15,   // (const) left of horizontal line
-  width: 3,     // (const) width of horizontal line
-  height: 4,    // height of vertical lines
-  top: 81,      // top most of range used for drawing pitch bend rect
-  bottom: 160,  // bottom most of range used for drawing pitch bend rect
-  from: {
-    vTop: 81,   // top of vertical line 
-    hTop: 81    // top of horizontal line
+  /** @const left of left-side vertical line*/
+  vLeft: 2,
+  /** @const right of right-side vertical line*/
+  vRight: 18,
+  /** @const left of horizontal line */
+  hLeft: 3,     
+  /** @const right of horizontal line*/
+  hRight: 15,
+  /** width of horizontal line*/
+  width: 3,
+  /** height of vertical lines */
+  height: 4,    
+  /** top most of range used for drawing pitch bend rect */
+  top: 81,
+  /** bottom most of range used for drawing pitch bend rect */
+  bottom: 160,
+  /** dimension of FROM bracket */
+  FROM: {
+    /** @type {number} top of vertical line  */
+    vTop: 81,
+    /** @type {number} top of horizontal line */
+    hTop: 81
   },
-  to: {
-    vTop: 157,  // top of vertical line
-    hTop: 160   // top of horizontal line
-  }
+  /** dimension of TO bracket */
+  TO: {
+    /** @type {number} top of vertical line */
+    vTop: 157,
+    /** @type {number} top of horizontal line */
+    hTop: 160
+  },
+  selectedTop: FROM.hTop
 };
 
 // functions called by Max messages
@@ -76,11 +97,11 @@ function active(attr) {
 
 /**
  * set color settings from live.colors
- * @param attr attribute name of live.colors
- * @param r red
- * @param g green
- * @param b blue
- * @param a alpha (not used)
+ * @param {string} attr attribute name of live.colors
+ * @param {number} r red
+ * @param {number} g green
+ * @param {number} b blue
+ * @param {number} a alpha (not used)
  */
 function setColor(attr, r, g, b, a) {
   if (attr === 'control_selection' || attr === 'lcd_control_fg') {
@@ -95,10 +116,9 @@ function setColor(attr, r, g, b, a) {
 
 /**
  * set 'from' range indicator represents position from m4l GUI
- * @param {Number} from 'From' pitch bend value
+ * @param {number} from 'From' pitch bend value
  */
 function setFrom(from) {
-  // post('setFrom', from, '\n');
   fromValue = Math.round(from) + SIGNED_FULL;
   outlet(0, 'from', fromValue);
   setRangePosition();
@@ -106,10 +126,9 @@ function setFrom(from) {
 
 /**
  * set 'from' range indicator represents position from m4l GUI
- * @param {Number} from 'From' pitch bend value
+ * @param {number} from 'From' pitch bend value
  */
  function setTo(to) {
-  // post('setTo', to, '\n');
   toValue = Math.round(to) + SIGNED_FULL;
   outlet(0, 'to', toValue);
   setRangePosition();
@@ -118,7 +137,6 @@ function setFrom(from) {
 function bang() {
   mgraphics.redraw();
 }
-
 
 /**
  * receiving pitch bend value
@@ -156,7 +174,6 @@ drawPitchBend.local = 1;
 function drawPitchBend() {
   if (!isActive) return;
   with(mgraphics) {
-    // TODO use fill_with_alpha
     if (pbPositionY < RECT.center) {
       if (pbPositionY > RANGE.bottom || pbPositionY < RANGE.top) {
         // out of range
@@ -212,10 +229,10 @@ function drawRange() {
     } else {
       set_source_rgb(COLOR.inactive);
     }
-    rectangle(RANGE.hLeft, RANGE.from.hTop, RANGE.width, 1);
-    rectangle(RANGE.hRight, RANGE.from.hTop, RANGE.width, 1);
-    rectangle(RANGE.vLeft, RANGE.from.vTop, 1, RANGE.height);
-    rectangle(RANGE.vRight, RANGE.from.vTop, 1, RANGE.height);
+    rectangle(RANGE.hLeft, RANGE.FROM.hTop, RANGE.width, 1);
+    rectangle(RANGE.hRight, RANGE.FROM.hTop, RANGE.width, 1);
+    rectangle(RANGE.vLeft, RANGE.FROM.vTop, 1, RANGE.height);
+    rectangle(RANGE.vRight, RANGE.FROM.vTop, 1, RANGE.height);
     fill();
     if (isActive) {
       if (selection === TO) {
@@ -226,43 +243,68 @@ function drawRange() {
     } else {
       set_source_rgb(COLOR.inactive);
     }
-    rectangle(RANGE.hLeft, RANGE.to.hTop, RANGE.width, 1);
-    rectangle(RANGE.hRight, RANGE.to.hTop, RANGE.width, 1);
-    rectangle(RANGE.vLeft, RANGE.to.vTop, 1, RANGE.height);
-    rectangle(RANGE.vRight, RANGE.to.vTop, 1, RANGE.height);
+    rectangle(RANGE.hLeft, RANGE.TO.hTop, RANGE.width, 1);
+    rectangle(RANGE.hRight, RANGE.TO.hTop, RANGE.width, 1);
+    rectangle(RANGE.vLeft, RANGE.TO.vTop, 1, RANGE.height);
+    rectangle(RANGE.vRight, RANGE.TO.vTop, 1, RANGE.height);
     fill();
   }
 }
 
 onclick.local = 1;
-function onclick(x, y, but, cmd, shift, capslock, option, ctrl) {
-  // post('onclick', y, but, '\n');
-  checkMouse(y);
-  pMouseY = y;
+function onclick(x, y, button, cmd, shift, capslock, option, ctrl) {
+  detectSelection(y);
+  liveZoom = (patcher.wind.location[3] - patcher.wind.location[1]) / PATCHER_HEIGHT;
+  cMouseX = x * liveZoom + patcher.wind.location[0];
+  if (shift && !cmd) {
+    pMouseY = 0;
+  } else {
+    pMouseY = y;
+  }
+  
   if (selection == null) return;
+  max.message('hidecursor');
 }
 
 ondrag.local = 1;
-function ondrag(x, y, but, cmd, shift, capslock, option, ctrl) {
-  // post('ondrag', y, but, cmd, shift, '\n');
-  if (but) {
-    if (selection == null) return;
-    var dy = y - pMouseY;
-    pMouseY = y;
-    if (selection == FROM) {
-      fromValue = calcValue(cmd, shift, fromValue, dy, y);
-      outlet(0, 'from', fromValue);
-      outlet(0, 'numFrom', fromValue - SIGNED_FULL);
-      setRangePosition();
-    } else if (selection == TO) {
-      toValue = calcValue(cmd, shift, toValue, dy, y);
-      outlet(0, 'to', toValue);
-      outlet(0, 'numTo', toValue - SIGNED_FULL);
-      setRangePosition();
+function ondrag(x, y, button, cmd, shift, capslock, option, ctrl) {
+  if (selection == null) return;
+  if (button) {
+    if (shift && !cmd) {
+      if (!isPrecise) {
+        isPrecise = true;
+      } else {
+        var dy = y - RANGE.selectedTop;
+        if (dy == 0) return;
+        dy = dy > 0 ? -1 : 1;
+        if (selection == FROM) {
+          setFromValue(fromValue + dy);
+        } else {
+          setToValue(toValue + dy);
+        }
+      }
+      pupdate();
+    } else {
+      if (isPrecise) {
+        isPrecise = false;
+        pMouseY = RANGE.selectedTop;
+        pupdate();
+        return;
+      }
+      var dy = y - pMouseY;
+      pMouseY = y;
+      isPrecise = false;
+      if (selection == FROM) {
+        setFromValue(calcValue(cmd, shift, fromValue, dy, y));
+      } else if (selection == TO) {
+        setToValue(calcValue(cmd, shift, toValue, dy, y));
+      }
     }
-  } else {
-    checkMouse(y);
+  } else {  // on released button
+    detectSelection(y);
     outlet(0, 'draw');
+    pupdate();
+    max.message('showcursor');
   }
 
   function calcValue(cmd, shift, value, delta, pos) {
@@ -272,16 +314,30 @@ function ondrag(x, y, but, cmd, shift, capslock, option, ctrl) {
     // (25-1)steps / 158px -> 0.1518987342, 16383 / (25-1)steps -> 682.625
     if (cmd) return clip(Math.round(UNSIGNED_FULL - Math.round(pos*0.1518987342) * 682.625), 0, UNSIGNED_FULL);
 
-    // 1value / 4px -> 0.25
-    if (shift) return clip(value - delta*0.25, 0, UNSIGNED_FULL);
-    
     // 16383 / 158px -> 103.689873
     return clip(Math.round(UNSIGNED_FULL - pos * 103.689873), 0, UNSIGNED_FULL);
-    //return clip(Math.round(value - delta*103.689873), 0, UNSIGNED_FULL);
   }
   
   function clip(value, min, max) {
     return Math.min(Math.max(value, min), max);
+  }
+
+  function setFromValue(value) {
+    fromValue = value;
+    outlet(0, 'from', fromValue);
+    outlet(0, 'numFrom', fromValue - SIGNED_FULL);
+    setRangePosition();
+  }
+
+  function setToValue(value) {
+    toValue = value;
+    outlet(0, 'to', toValue);
+    outlet(0, 'numTo', toValue - SIGNED_FULL);
+    setRangePosition();
+  }
+
+  function pupdate() {
+     max.message('pupdate', cMouseX, Math.round(RANGE.selectedTop * liveZoom) + patcher.wind.location[1]);
   }
 }
 
@@ -295,19 +351,21 @@ function onidleout(x, y, but, cmd, shift, capslock, option, ctrl) {
 
 onidle.local = 1;
 function onidle(x, y, but, cmd, shift, capslock, option, ctrl) {
-  checkMouse(y);
+  detectSelection(y);
   outlet(0, 'draw');
 }
 
 /**
  * check and decide which of range item to pick
  */
-checkMouse.local = 1;
-function checkMouse(y) {
-  if (y <= (RANGE.to.hTop + 4) && y >= (RANGE.to.hTop - 4) ) {
+detectSelection.local = 1;
+function detectSelection(y) {
+  if (y <= (RANGE.TO.hTop + 4) && y >= (RANGE.TO.hTop - 4) ) {
     selection = TO;
-  } else if (y <= (RANGE.from.hTop + 4) && y >= (RANGE.from.hTop - 4) ) {
+    RANGE.selectedTop = RANGE.TO.hTop;
+  } else if (y <= (RANGE.FROM.hTop + 4) && y >= (RANGE.FROM.hTop - 4) ) {
     selection = FROM;
+    RANGE.selectedTop = RANGE.FROM.hTop;
   } else {
     selection = null;
   }
@@ -318,21 +376,22 @@ function checkMouse(y) {
  */
  setRangePosition.local = 1;
  function setRangePosition() {
-   RANGE.from.hTop = getPositionY(fromValue);
-   RANGE.to.hTop = getPositionY(toValue);
-   var sub = Math.abs(RANGE.from.hTop - RANGE.to.hTop);
+   RANGE.FROM.hTop = getPositionY(fromValue);
+   RANGE.TO.hTop = getPositionY(toValue);
+   var sub = Math.abs(RANGE.FROM.hTop - RANGE.TO.hTop);
    RANGE.height = (sub >= 4) ? 4 : sub;
    if (fromValue > toValue) {
-     RANGE.top = RANGE.from.hTop;
-     RANGE.bottom = RANGE.to.hTop;
-     RANGE.from.vTop = RANGE.from.hTop;
-     RANGE.to.vTop = RANGE.to.hTop - RANGE.height + 1;
+     RANGE.top = RANGE.FROM.hTop;
+     RANGE.bottom = RANGE.TO.hTop;
+     RANGE.FROM.vTop = RANGE.FROM.hTop;
+     RANGE.TO.vTop = RANGE.TO.hTop - RANGE.height + 1;
    } else {
-     RANGE.top = RANGE.to.hTop;
-     RANGE.bottom = RANGE.from.hTop;
-     RANGE.from.vTop = RANGE.from.hTop - RANGE.height + 1;
-     RANGE.to.vTop = RANGE.to.hTop;
+     RANGE.top = RANGE.TO.hTop;
+     RANGE.bottom = RANGE.FROM.hTop;
+     RANGE.FROM.vTop = RANGE.FROM.hTop - RANGE.height + 1;
+     RANGE.TO.vTop = RANGE.TO.hTop;
    }
+   RANGE.selectedTop = selection == FROM ? RANGE.FROM.hTop : RANGE.TO.hTop;
    outlet(0, 'draw');
  }
  
