@@ -29,4 +29,4 @@ Shift+drag can adjust finely. Cmd/ctrl+drag changes in 25 steps (+/- 12 steps an
 129 steps with shift+cmd/ctrl (+/- 64 steps and zero).
 
 ## Precautions for use and known issues
-See [issues](https://github.com/h1data/M4L-pitchw-curve/issues?q=).
+See the [issue](https://github.com/h1data/M4L-pitchw-curve/issues/6).
